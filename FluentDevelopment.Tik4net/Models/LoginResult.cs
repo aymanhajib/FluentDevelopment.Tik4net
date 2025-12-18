@@ -1,5 +1,7 @@
 ﻿
 
+using System;
+
 namespace FluentDevelopment.Tik4net.Models;
 
 public class LoginResult

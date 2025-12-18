@@ -1,5 +1,8 @@
 ﻿
 
+using System;
+using System.Collections.Generic;
+
 namespace FluentDevelopment.Tik4net.Models
 {
     public class ConnectionStatistics

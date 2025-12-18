@@ -1,5 +1,8 @@
 ﻿using System.Net.NetworkInformation;
 using System.Net;
+using System.Threading.Tasks;
+using System.Net.Http;
+using System;
 
 namespace FluentDevelopment.Tik4net
 {

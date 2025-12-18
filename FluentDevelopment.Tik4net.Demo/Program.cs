@@ -1,7 +1,6 @@
 ﻿
 using FluentDevelopment.Tik4net.Models;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Debug;
 using tik4net;
 
 namespace FluentDevelopment.Tik4net.Demo

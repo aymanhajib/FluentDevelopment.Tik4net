@@ -1,4 +1,6 @@
 ﻿
+using System.Threading.Tasks;
+
 namespace FluentDevelopment.Tik4net
 {
     public static class ConnectivityService
