@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.13.35825.156 d17.13
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FluentDevelopment.Tik4net", "FluentDevelopment.Tik4net\FluentDevelopment.Tik4net.csproj", "{CCE2EAFB-D3E6-4CC8-B10A-D48C2220C71A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FluentDevelopment.Tik4net.Demo", "FluentDevelopment.Tik4net.Demo\FluentDevelopment.Tik4net.Demo.csproj", "{ABEE4F75-9AC7-46F0-92E1-69A2A543FB67}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{CCE2EAFB-D3E6-4CC8-B10A-D48C2220C71A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CCE2EAFB-D3E6-4CC8-B10A-D48C2220C71A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CCE2EAFB-D3E6-4CC8-B10A-D48C2220C71A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CCE2EAFB-D3E6-4CC8-B10A-D48C2220C71A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{ABEE4F75-9AC7-46F0-92E1-69A2A543FB67}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{ABEE4F75-9AC7-46F0-92E1-69A2A543FB67}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{ABEE4F75-9AC7-46F0-92E1-69A2A543FB67}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{ABEE4F75-9AC7-46F0-92E1-69A2A543FB67}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {1A35C242-4D8D-4778-978C-F141B8FA602C}
+	EndGlobalSection
+EndGlobal
