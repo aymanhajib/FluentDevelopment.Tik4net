@@ -42,8 +42,10 @@ public class TikConnectionPool : IDisposable
     {
         try
         {
+            /*
             if (!Internet)
-                return LoginResult.Failure("يجب الاتصال بشبكة الانترنت");
+                return LoginResult.Failure("يجب الاتصال بشبكة الانترنت");*/
+
             // التحقق من صحة المدخلات
             if (string.IsNullOrWhiteSpace(host))
                 return LoginResult.Failure("يجب إدخال عنوان الخادم");
@@ -146,6 +148,48 @@ public class TikConnectionPool : IDisposable
         }
     }
 
+    public ITikConnection GetConnection()
+    {
+        if (!IsLoggedIn)
+            throw new InvalidOperationException("يجب تسجيل الدخول أولاً");
+
+        if (_disposed)
+            throw new ObjectDisposedException(nameof(TikConnectionPool));
+
+        try
+        {
+            ITikConnection? connection = null;
+
+            if (_availableConnections.TryDequeue(out connection))
+            {
+                if (!IsConnectionHealthy(connection))
+                {
+                    connection.Dispose();
+                    connection = CreateConnection();
+                }
+            }
+            else
+            {
+                if (TotalConnections < _maxPoolSize)
+                {
+                    connection = CreateConnection();
+                }
+            }
+
+            if (connection != null)
+            {
+                _activeConnections[connection] = true;
+                return connection;
+            }
+
+            throw new InvalidOperationException("لا يمكن إنشاء اتصال جديد");
+        }
+        catch
+        {
+            throw;
+        }
+    }
+
     public async Task<bool> ReconnectAsync(ITikConnection connection)
     {
         if (_credentials == null) return false;
@@ -202,6 +246,42 @@ public class TikConnectionPool : IDisposable
         }
     }
 
+    public void ReturnConnection(ITikConnection connection)
+    {
+        if (_disposed || connection == null)
+        {
+            connection?.Dispose();
+            return;
+        }
+
+        try
+        {
+            _activeConnections.TryRemove(connection, out _);
+
+            // التحقق من صحة الاتصال قبل إعادته
+            if (IsConnectionHealthy(connection) && _availableConnections.Count < _maxPoolSize)
+            {
+                _availableConnections.Enqueue(connection);
+            }
+            else
+            {
+                // استبدال الاتصال المعطوب
+                connection.Dispose();
+                if (TotalConnections < _maxPoolSize)
+                {
+                    var newConnection = CreateConnection();
+                    if (newConnection != null)
+                    {
+                        _availableConnections.Enqueue(newConnection);
+                    }
+                }
+            }
+        }
+        finally
+        {
+        }
+    }
+
     private async Task InitializePoolAsync(int initialConnections)
     {
         for (int i = 0; i < initialConnections && i < _maxPoolSize; i++)
@@ -237,16 +317,57 @@ public class TikConnectionPool : IDisposable
         });
     }
 
+    private ITikConnection? CreateConnection(string? host = null, string? username = null, string? password = null, int? port = null)
+    {
+        try
+        {
+            var connection = ConnectionFactory.CreateConnection(TikConnectionType.Api);
+            var targetHost = host ?? _credentials?.Host;
+            var targetUsername = username ?? _credentials?.Username;
+            var targetPassword = password ?? _credentials?.Password;
+            var targetPort = port ?? _credentials?.Port ?? 8728;
+
+            connection.Open(targetHost, targetPort, targetUsername, targetPassword);
+            return connection;
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"فشل إنشاء اتصال: {ex.Message}");
+            return null;
+        }
+    }
+
     private async Task<bool> IsConnectionHealthyAsync(ITikConnection connection)
     {
         if (connection == null || !connection.IsOpened)
             return false;
 
+       return await Task.Run(() =>
+        {
+            try
+            {
+                var testCommand = connection.CreateCommand("/system/identity/print");
+                testCommand.ExecuteScalar();
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        });
+    }
+
+    private bool IsConnectionHealthy(ITikConnection connection)
+    {
+        if (connection == null || !connection.IsOpened)
+            return false;
         try
         {
+            /*
             var testCommand = connection.CreateCommand("/system/identity/print");
-            await Task.Run(() => testCommand.ExecuteScalar());
-            return true;
+            testCommand.ExecuteScalar();
+            return true;*/
+            return connection.IsOpened;
         }
         catch
         {
