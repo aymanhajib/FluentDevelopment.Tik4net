@@ -28,6 +28,32 @@ namespace FluentDevelopment.Tik4net.Demo
             try
             {
                 await RunCompleteDemo(tikService);
+                /*
+                var loginResult = await tikService.LoginAsync(
+                host: "192.168.88.1",
+                username: "ayman",
+                password: "123Qwertyuiop!@#",
+                port: 8728);
+                var res = tikService.Quick( con =>
+                {
+                    var activeCmd = con.CreateCommand("/ip/hotspot/active/print");
+                    //activeCmd.AddParameter("?user", "123456");
+                    var activeList = activeCmd.ExecuteList();
+
+                    foreach (var i in activeList)
+                    {
+                        Console.WriteLine(i.Words["mac-address"]);
+                    }
+
+                });
+                if (res.IsSuccess)
+                {
+                    Console.WriteLine("تم العميلة");
+                }
+                else
+                {
+                    Console.WriteLine(res.ErrorMessage);
+                }*/
             }
             catch (Exception ex)
             {
@@ -67,16 +93,15 @@ namespace FluentDevelopment.Tik4net.Demo
             {
                 var cmd = connection.CreateCommand("/system/resource/print");
                 var result = await Task.Run(() => cmd.ExecuteList());
-                return result;
-            });
-
-            if (systemInfo.IsSuccess && systemInfo.Data != null)
-            {
-                Console.WriteLine($" System Information: {systemInfo.Data.Count()} regester");
-                foreach (var item in systemInfo.Data)
+                foreach (var item in result)
                 {
                     Console.WriteLine($"  - CPU: {item.GetResponseField("cpu-load")}% | Uptime: {item.GetResponseField("uptime")}");
                 }
+            });
+
+            if (systemInfo.IsSuccess)
+            {
+                Console.WriteLine($" System Information regester");
             }
 
             // مثال 2: جلب قائمة المستخدمين
@@ -84,12 +109,12 @@ namespace FluentDevelopment.Tik4net.Demo
             {
                 var cmd = connection.CreateCommand("/user/print");
                 var users = await Task.Run(() => cmd.ExecuteList());
-                return users.Count();
+                Console.WriteLine($"Number of users: {users.Count()}");
             });
 
             if (usersCount.IsSuccess)
             {
-                Console.WriteLine($"Number of users: {usersCount.Data}");
+                Console.WriteLine($"Number of users");
             }
             /*
             // ===== 3. استخدام RetryAsync =====
@@ -124,8 +149,8 @@ namespace FluentDevelopment.Tik4net.Demo
             else
             {
                 Console.WriteLine($"فشل مع المهلة: {timeoutResult.ErrorMessage}");
-            }
-            */
+            }*/
+            
             // ===== 5. استخدام GetLongConnectionAsync =====
             Console.WriteLine("\n5. Use GetLongConnectionAsync to long conection...");
 
@@ -144,7 +169,7 @@ namespace FluentDevelopment.Tik4net.Demo
                     Console.WriteLine($"  - Status conection: {status.Status}");
                 });
 
-            if (longConnectionResult.IsSuccess)
+            if (longConnectionResult.IsSuccess && longConnectionResult.Data != null)
             {
                 var longConnection = longConnectionResult.Data;
                 Console.WriteLine($"created long connection with counter: {longConnection.Id}");

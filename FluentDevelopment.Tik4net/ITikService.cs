@@ -10,8 +10,7 @@ namespace FluentDevelopment.Tik4net;
 public interface ITikService
 {
     // الاتصالات القصيرة (تلقائية)
-    Task<IOperationResult<T>> QuickAsync<T>(Func<ITikConnection, Task<T>> operation, CancellationToken cancellationToken = default);
-    IOperationResult<T> Quick<T>(Func<ITikConnection, T> operation);
+    Task<IOperationResult> QuickAsync(Func<ITikConnection, Task> operation, CancellationToken cancellationToken = default);
     IOperationResult Quick(Action<ITikConnection> operation);
 
     // الاتصالات الطويلة (يدوية بسيطة)
@@ -19,13 +18,9 @@ public interface ITikService
             string? connectionName = null,
             Action<LongConnectionStatus>? onStatusChanged = null,
             CancellationToken cancellationToken = default);
-    IOperationResult<ILongConnection> GetLongConnection(
-            Action<ITikConnection>? operation = null,
-            string? connectionName = null,
-            Action<LongConnectionStatus>? onStatusChanged = null);
 
     // عمليات الخلفية (تلقائية)
-    Task<IOperationResult> BackgroundAsync(Func<ITikConnection, Task> operation,Action<IOperationResult>? onCompleted = null,
+    Task<IOperationResult> BackgroundAsync(Func<ITikConnection, Task> operation, Action<IOperationResult>? onCompleted = null,
         CancellationToken cancellationToken = default);
 
     // تسجيل الدخول
@@ -37,6 +32,3 @@ public interface ITikService
     int AvailableConnections { get; }
     int ActiveConnections { get; }
 }
-
-
-

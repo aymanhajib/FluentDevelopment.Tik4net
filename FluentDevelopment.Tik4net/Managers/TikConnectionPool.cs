@@ -36,15 +36,11 @@ public class TikConnectionPool : IDisposable
     public int AvailableConnections => _availableConnections.Count;
     public int ActiveConnections => _activeConnections.Count;
     public int TotalConnections => AvailableConnections + ActiveConnections;
-    public bool Internet => ConnectivityService.IsFullyConnected;
 
     public async Task<LoginResult> LoginAsync(string host, string username, string password, int port = 8728)
     {
         try
         {
-            /*
-            if (!Internet)
-                return LoginResult.Failure("يجب الاتصال بشبكة الانترنت");*/
 
             // التحقق من صحة المدخلات
             if (string.IsNullOrWhiteSpace(host))
@@ -76,7 +72,7 @@ public class TikConnectionPool : IDisposable
             }
             else
             {
-                return LoginResult.Failure("فشل في الاتصال بالخادم. تحقق من البيانات وإمكانية الوصول");
+                return LoginResult.Failure("فشل في الاتصال بالخادم.\nتحقق من البيانات وإمكانية الوصول");
             }
         }
         catch (TikConnectionException ex)
@@ -85,11 +81,11 @@ public class TikConnectionPool : IDisposable
         }
         catch (TimeoutException)
         {
-            return LoginResult.Failure("انتهت مهلة الاتصال. تحقق من إمكانية الوصول للخادم");
+            return LoginResult.Failure("انتهت مهلة الاتصال.\nتحقق من إمكانية الوصول للخادم");
         }
         catch (UnauthorizedAccessException)
         {
-            return LoginResult.Failure("بيانات الدخول غير صحيحة. تحقق من اسم المستخدم وكلمة المرور");
+            return LoginResult.Failure("بيانات الدخول غير صحيحة.\nتحقق من اسم المستخدم وكلمة المرور");
         }
         catch (Exception ex)
         {
@@ -240,6 +236,7 @@ public class TikConnectionPool : IDisposable
                 }
             }
         }
+        catch { }
         finally
         {
             _poolSemaphore.Release();
@@ -277,9 +274,7 @@ public class TikConnectionPool : IDisposable
                 }
             }
         }
-        finally
-        {
-        }
+        catch { }
     }
 
     private async Task InitializePoolAsync(int initialConnections)
@@ -296,7 +291,7 @@ public class TikConnectionPool : IDisposable
 
     private async Task<ITikConnection?> CreateConnectionAsync(string? host = null, string? username = null, string? password = null, int? port = null)
     {
-        return await Task.Run( async () =>
+        return await Task.Run(async () =>
         {
             try
             {
@@ -342,7 +337,7 @@ public class TikConnectionPool : IDisposable
         if (connection == null || !connection.IsOpened)
             return false;
 
-       return await Task.Run(() =>
+        return await Task.Run(() =>
         {
             try
             {
@@ -363,11 +358,9 @@ public class TikConnectionPool : IDisposable
             return false;
         try
         {
-            /*
             var testCommand = connection.CreateCommand("/system/identity/print");
             testCommand.ExecuteScalar();
-            return true;*/
-            return connection.IsOpened;
+            return true;
         }
         catch
         {
@@ -401,7 +394,7 @@ public class TikConnectionPool : IDisposable
                     }
                     else
                     {
-                        connectionsToRemove.Add(connection); //标记 الاتصال المعطوب
+                        connectionsToRemove.Add(connection); //الاتصال المعطوب
                     }
                 }
 
@@ -434,7 +427,7 @@ public class TikConnectionPool : IDisposable
 
     private async Task DisposeAllConnectionsAsync()
     {
-       await Task.Run(() =>
+        await Task.Run(() =>
         {
             // إغلاق الاتصالات النشطة
             foreach (var connection in _activeConnections.Keys)

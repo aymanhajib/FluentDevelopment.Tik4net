@@ -18,7 +18,7 @@ public class TikService : ITikService, IDisposable
     private readonly ILogger<TikService>? _logger;
     private bool _disposed = false;
 
-    public TikService(int maxPoolSize = 10 , ILogger<TikService>? logger = null)
+    public TikService(int maxPoolSize = 10, ILogger<TikService>? logger = null)
     {
         _pool = new TikConnectionPool(maxPoolSize);
         _logger = logger;
@@ -35,140 +35,90 @@ public class TikService : ITikService, IDisposable
     }
 
     // 1. QuickAsync المحسنة
-    public async Task<IOperationResult<T>> QuickAsync<T>(
-        Func<ITikConnection, Task<T>> operation,
+    public async Task<IOperationResult> QuickAsync(
+        Func<ITikConnection, Task> operation,
         CancellationToken cancellationToken = default)
     {
         var startTime = DateTime.UtcNow;
-
+        ITikConnection? connection = null;
         try
         {
             _logger?.LogDebug("Starting QuickAsync operation");
 
             // التحقق من حالة الخدمة
             if (!IsLoggedIn)
-                return OperationResult<T>.Failure(
+                return OperationResult.Failure(
                     "Service is not logged in",
                     null,
                     DateTime.UtcNow - startTime);
 
             // الحصول على اتصال
-            var connection = await _pool.GetConnectionAsync(cancellationToken);
+            connection = await _pool.GetConnectionAsync(cancellationToken);
 
-            try
-            {
-                // تنفيذ العملية
-                var result = await operation(connection);
+            // تنفيذ العملية
+            await operation(connection);
 
-                _logger?.LogInformation("QuickAsync operation completed successfully");
-                return OperationResult<T>.Success(
-                    result,
-                    DateTime.UtcNow - startTime);
-            }
-            finally
+            _logger?.LogInformation("QuickAsync operation completed successfully");
+            return OperationResult.Success(
+                DateTime.UtcNow - startTime);
+        }
+        catch (Exception ex)
+        {
+            return OperationResult.Failure(
+                GetMessageException(ex, "QuickAsync"),
+                ex,
+                DateTime.UtcNow - startTime);
+        }
+        finally
+        {
+            if (connection != null)
             {
                 // إرجاع الاتصال للـ Pool حتى في حالة الخطأ
                 await _pool.ReturnConnectionAsync(connection);
             }
         }
-        catch (OperationCanceledException ex)
-        {
-            _logger?.LogWarning(ex, "QuickAsync operation was cancelled");
-            return OperationResult<T>.Failure(
-                "Operation was cancelled",
-                ex,
-                DateTime.UtcNow - startTime);
-        }
-        catch(NotImplementedException ex)
-        {
-            _logger?.LogError(ex, "QuickAsync operation with Response type '!empty' not supported");
-            return OperationResult<T>.Failure(
-                "عذرا لايوجد كروت",
-                ex,
-                DateTime.UtcNow - startTime);
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogError(ex, "QuickAsync operation failed");
-            return OperationResult<T>.Failure(
-                $"Operation failed: {ex.Message}",
-                ex,
-                DateTime.UtcNow - startTime);
-        }
     }
 
-    public IOperationResult<T> Quick<T>(Func<ITikConnection, T> operation)
+    public IOperationResult Quick(Action<ITikConnection> operation)
     {
         var startTime = DateTime.UtcNow;
-
+        ITikConnection? connection = null;
         try
         {
             _logger?.LogDebug("Starting Quick operation");
 
             // التحقق من حالة الخدمة
             if (!IsLoggedIn)
-                return OperationResult<T>.Failure(
+                return OperationResult.Failure(
                     "Service is not logged in",
                     null,
                     DateTime.UtcNow - startTime);
 
             // الحصول على اتصال
-            var connection = _pool.GetConnection();
+            connection = _pool.GetConnection();
 
-            try
-            {
-                // تنفيذ العملية
-                var result = operation(connection);
+            // تنفيذ العملية
+            operation(connection);
 
-                _logger?.LogInformation("Quick operation completed successfully");
-                return OperationResult<T>.Success(
-                    result,
-                    DateTime.UtcNow - startTime);
-            }
-            finally
-            {
-                // إرجاع الاتصال للـ Pool حتى في حالة الخطأ
-                _pool.ReturnConnection(connection);
-            }
-        }
-        catch (OperationCanceledException ex)
-        {
-            _logger?.LogWarning(ex, "Quick operation was cancelled");
-            return OperationResult<T>.Failure(
-                "Operation was cancelled",
-                ex,
-                DateTime.UtcNow - startTime);
-        }
-        catch (NotImplementedException ex)
-        {
-            _logger?.LogError(ex, "Quick operation with Response type '!empty' not supported");
-            return OperationResult<T>.Failure(
-                "عذرا لايوجد كروت",
-                ex,
+            _logger?.LogInformation("Quick operation completed successfully");
+            return OperationResult.Success(
                 DateTime.UtcNow - startTime);
         }
         catch (Exception ex)
         {
-            _logger?.LogError(ex, "Quick operation failed");
-            return OperationResult<T>.Failure(
-                $"Operation failed: {ex.Message}",
+            return OperationResult.Failure(
+                GetMessageException(ex, "Quick"),
                 ex,
                 DateTime.UtcNow - startTime);
         }
-    }
-
-    public IOperationResult Quick(Action<ITikConnection> operation)
-    {
-       IOperationResult<bool> res = Quick<bool>((c) =>
+        finally
         {
-            operation(c);
-            return true;
-        });
-        if (res.IsSuccess) {
-
-            return OperationResult.Success(res.ExecutionTime);
+            // إرجاع الاتصال للـ Pool حتى في حالة الخطأ
+            if (connection != null)
+            {
+                _pool.ReturnConnection(connection);
+            }
         }
-        return OperationResult.Failure(res.ErrorMessage!, res.Exception, res.ExecutionTime);
     }
 
     // 2. GetLongConnectionAsync المحسنة
@@ -242,122 +192,10 @@ public class TikService : ITikService, IDisposable
                 longConnection,
                 DateTime.UtcNow - startTime);
         }
-        catch (OperationCanceledException ex)
-        {
-            _logger?.LogWarning(ex, "GetLongConnectionAsync was cancelled");
-            return OperationResult<ILongConnection>.Failure(
-                "Operation was cancelled",
-                ex,
-                DateTime.UtcNow - startTime);
-        }
-        catch (NotImplementedException ex)
-        {
-            _logger?.LogError(ex, "GetLongConnectionAsync operation with Response type '!empty' not supported");
-            return OperationResult<ILongConnection>.Failure(
-                "عذرا لايوجد كروت",
-                ex,
-                DateTime.UtcNow - startTime);
-        }
         catch (Exception ex)
         {
-            _logger?.LogError(ex, "Failed to create long connection");
             return OperationResult<ILongConnection>.Failure(
-                $"Failed to create long connection: {ex.Message}",
-                ex,
-                DateTime.UtcNow - startTime);
-        }
-    }
-
-    public IOperationResult<ILongConnection> GetLongConnection(
-            Action<ITikConnection>? operation = null,
-            string? connectionName = null,
-            Action<LongConnectionStatus>? onStatusChanged = null)
-    {
-        connectionName ??= "LongConnection";
-        var startTime = DateTime.UtcNow;
-        var connectionId = Guid.NewGuid();
-
-        try
-        {
-            _logger?.LogDebug("Creating long connection {ConnectionId}", connectionId);
-
-            if (!IsLoggedIn)
-                return OperationResult<ILongConnection>.Failure(
-                    "Service is not logged in",
-                    null,
-                    DateTime.UtcNow - startTime);
-
-            var connection = _pool.GetConnection();
-
-            // إنشاء اتصال طويل
-            var longConnection = new LongConnection(
-                connectionId,
-                connection,
-                connectionName,
-                async (conn) =>
-                {
-                    _activeLongConnections.TryRemove(connectionId, out _);
-                    await _pool.ReturnConnectionAsync(conn);
-
-                    onStatusChanged?.Invoke(new LongConnectionStatus
-                    {
-                        ConnectionId = connectionId,
-                        Status = ConnectionStatus.Disposed,
-                        Timestamp = DateTime.UtcNow
-                    });
-                },
-                onStatusChanged,
-                _pool.ReconnectAsync,
-                _logger);
-
-            // إضافة للقائمة النشطة
-            _activeLongConnections.TryAdd(connectionId, longConnection);
-
-            // تنفيذ callback إذا وُجد
-            if (operation != null)
-            {
-                try
-                {
-                    operation(connection);
-                }
-                catch (Exception ex)
-                {
-                    _logger?.LogError(ex,
-                        "Error in onConnected callback for connection {ConnectionId}",
-                        connectionId);
-                    // لا نعيد فشلاً هنا لأن الاتصال تم إنشاؤه بنجاح
-                }
-            }
-
-            _logger?.LogInformation(
-                "Long connection {ConnectionId} created successfully",
-                connectionId);
-
-            return OperationResult<ILongConnection>.Success(
-                longConnection,
-                DateTime.UtcNow - startTime);
-        }
-        catch (OperationCanceledException ex)
-        {
-            _logger?.LogWarning(ex, "GetLongConnection was cancelled");
-            return OperationResult<ILongConnection>.Failure(
-                "Operation was cancelled",
-                ex,
-                DateTime.UtcNow - startTime);
-        }
-        catch (NotImplementedException ex)
-        {
-            _logger?.LogError(ex, "GetLongConnection operation with Response type '!empty' not supported");
-            return OperationResult<ILongConnection>.Failure(
-                "عذرا لايوجد كروت",
-                ex,
-                DateTime.UtcNow - startTime);
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogError(ex, "Failed to create long connection");
-            return OperationResult<ILongConnection>.Failure(
-                $"Failed to create long connection: {ex.Message}",
+                GetMessageException(ex, "GetLongConnectionAsync"),
                 ex,
                 DateTime.UtcNow - startTime);
         }
@@ -408,7 +246,7 @@ public class TikService : ITikService, IDisposable
                 catch (Exception ex)
                 {
                     backgroundResult = OperationResult.Failure(
-                        $"Background operation failed: {ex.Message}",
+                        GetMessageException(ex, "Background"),
                         ex,
                         DateTime.UtcNow - startTime);
 
@@ -434,13 +272,74 @@ public class TikService : ITikService, IDisposable
                 operationId);
 
             var result = OperationResult.Failure(
-                $"Failed to start background operation: {ex.Message}",
+                GetMessageException(ex, "Background"),
                 ex,
                 DateTime.UtcNow - startTime);
 
             onCompleted?.Invoke(result);
             return result;
         }
+    }
+
+    private string GetMessageException(Exception ex, string actionName)
+    {
+        // سنستخدم المتغير message لتخزين ما سيظهر للمستخدم أو الواجهة
+        string message;
+
+        if (ex is NotImplementedException)
+        {
+            _logger?.LogError(ex, $"{actionName} operation not supported");
+            message = "هذه العملية غير مدعومة في إصدار المايكروتك الحالي.";
+        }
+        else if (ex is InvalidOperationException || ex is OperationCanceledException)
+        {
+            _logger?.LogWarning(ex, $"{actionName} operation was cancelled");
+            message = "تم إلغاء العملية أو أنها غير صالحة حالياً.";
+        }
+        // الخطأ الأكثر شيوعاً: السيرفر رفض الأمر لسبب منطقي (مثل كلمة سر ضعيفة أو مستخدم موجود)
+        else if (ex is TikCommandTrapException trapEx)
+        {
+            _logger?.LogWarning(trapEx, $"{actionName}: Trap error from RouterOS");
+            // جلب الرسالة القادمة من المايكروتك نفسه (مثل: "user already exists")
+            message = $"خطأ من السيرفر: {trapEx.Code} - {trapEx.Message}";
+        }
+        else if (ex is TikCommandFatalException fatalEx)
+        {
+            _logger?.LogCritical(fatalEx, $"{actionName}: Fatal connection error");
+            message = "انقطع الاتصال بالسيرفر بشكل مفاجئ. يرجى التحقق من الشبكة.";
+        }
+        else if (ex is TikNoSuchCommandException)
+        {
+            _logger?.LogError(ex, $"{actionName}: Invalid API path");
+            message = "المسار البرمجي غير صحيح. يرجى التأكد من كتابة الأمر بدقة.";
+        }
+        else if (ex is TikNoSuchItemException)
+        {
+            _logger?.LogWarning(ex, $"{actionName}: Item not found");
+            message = "العنصر المطلوب (مستخدم/سجل) غير موجود في السيرفر.";
+        }
+        else if (ex is TikAlreadyHaveSuchItemException)
+        {
+            _logger?.LogWarning(ex, $"{actionName}: Duplicate item");
+            message = "هذا العنصر (الاسم أو المعرف) موجود مسبقاً في السيرفر.";
+        }
+        else if (ex is TikCommandUnexpectedResponseException unexEx)
+        {
+            _logger?.LogError(unexEx, $"{actionName}: Unexpected response");
+            message = "وصل رد غير متوقع من السيرفر. قد يكون هناك اختلاف في الإصدارات.";
+        }
+        else if (ex is TikCommandAmbiguousResultException)
+        {
+            _logger?.LogError(ex, $"{actionName}: Ambiguous result");
+            message = "النتيجة غامضة؛ الأمر أعاد أكثر من قيمة بينما المتوقع قيمة واحدة.";
+        }
+        else
+        {
+            _logger?.LogError(ex, $"{actionName}: operation failed with unknown error");
+            message = "حدث خطأ غير معروف أثناء تنفيذ العملية.";
+        }
+
+        return message;
     }
 
     // 4. LongConnection المحسنة
