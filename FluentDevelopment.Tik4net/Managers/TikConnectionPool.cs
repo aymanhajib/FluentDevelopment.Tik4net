@@ -10,6 +10,9 @@ using tik4net;
 
 namespace FluentDevelopment.Tik4net.Managers;
 
+/// <summary>
+/// Provides a pool of reusable connections to a MikroTik device using the tik4net API.
+/// </summary>
 public class TikConnectionPool : IDisposable
 {
     private readonly ConcurrentQueue<ITikConnection> _availableConnections;
@@ -18,8 +21,12 @@ public class TikConnectionPool : IDisposable
     private readonly int _maxPoolSize;
     private TikCredentials? _credentials;
     private bool _disposed = false;
-    private Timer _healthCheckTimer;
+    private readonly Timer _healthCheckTimer;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="TikConnectionPool"/> class.
+    /// </summary>
+    /// <param name="maxPoolSize">The maximum number of connections in the pool.</param>
     public TikConnectionPool(int maxPoolSize = 10)
     {
         _maxPoolSize = maxPoolSize;
@@ -32,16 +39,38 @@ public class TikConnectionPool : IDisposable
             TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
     }
 
+    /// <summary>
+    /// Gets a value indicating whether the pool is logged in with valid credentials.
+    /// </summary>
     public bool IsLoggedIn => _credentials?.IsValid == true;
+
+    /// <summary>
+    /// Gets the number of available connections in the pool.
+    /// </summary>
     public int AvailableConnections => _availableConnections.Count;
+
+    /// <summary>
+    /// Gets the number of active (checked out) connections.
+    /// </summary>
     public int ActiveConnections => _activeConnections.Count;
+
+    /// <summary>
+    /// Gets the total number of connections (available + active).
+    /// </summary>
     public int TotalConnections => AvailableConnections + ActiveConnections;
 
+    /// <summary>
+    /// Logs in to the MikroTik device and initializes the connection pool.
+    /// </summary>
+    /// <param name="host">The host address of the MikroTik device.</param>
+    /// <param name="username">The username for authentication.</param>
+    /// <param name="password">The password for authentication.</param>
+    /// <param name="port">The port to connect to (default is 8728).</param>
+    /// <returns>A <see cref="LoginResult"/> indicating success or failure.</returns>
     public async Task<LoginResult> LoginAsync(string host, string username, string password, int port = 8728)
     {
         try
         {
-
             // التحقق من صحة المدخلات
             if (string.IsNullOrWhiteSpace(host))
                 return LoginResult.Failure("يجب إدخال عنوان الخادم");
@@ -93,22 +122,31 @@ public class TikConnectionPool : IDisposable
             return LoginResult.Failure($"حدث خطأ غير متوقع: {ex.Message}");
         }
     }
+
+    /// <summary>
+    /// Logs out and disposes all connections in the pool.
+    /// </summary>
     public async Task LogoutAsync()
     {
         await DisposeAllConnectionsAsync();
         _credentials = null;
     }
 
+    /// <summary>
+    /// Gets a connection from the pool asynchronously.
+    /// </summary>
+    /// <param name="cancellationToken">A cancellation token.</param>
+    /// <returns>An available <see cref="ITikConnection"/>.</returns>
+    /// <exception cref="InvalidOperationException">Thrown if not logged in.</exception>
+    /// <exception cref="ObjectDisposedException">Thrown if the pool is disposed.</exception>
     public async Task<ITikConnection> GetConnectionAsync(CancellationToken cancellationToken = default)
     {
         if (!IsLoggedIn)
             throw new InvalidOperationException("يجب تسجيل الدخول أولاً");
 
-        if (_disposed)
-            throw new ObjectDisposedException(nameof(TikConnectionPool));
+        ObjectDisposedException.ThrowIf(_disposed, nameof(TikConnectionPool));
 
         await _poolSemaphore.WaitAsync(cancellationToken);
-
         try
         {
             ITikConnection? connection = null;
@@ -144,13 +182,18 @@ public class TikConnectionPool : IDisposable
         }
     }
 
+    /// <summary>
+    /// Gets a connection from the pool synchronously.
+    /// </summary>
+    /// <returns>An available <see cref="ITikConnection"/>.</returns>
+    /// <exception cref="InvalidOperationException">Thrown if not logged in.</exception>
+    /// <exception cref="ObjectDisposedException">Thrown if the pool is disposed.</exception>
     public ITikConnection GetConnection()
     {
         if (!IsLoggedIn)
             throw new InvalidOperationException("يجب تسجيل الدخول أولاً");
 
-        if (_disposed)
-            throw new ObjectDisposedException(nameof(TikConnectionPool));
+        ObjectDisposedException.ThrowIf(_disposed, nameof(TikConnectionPool));
 
         try
         {
@@ -186,6 +229,11 @@ public class TikConnectionPool : IDisposable
         }
     }
 
+    /// <summary>
+    /// Attempts to reconnect the specified connection asynchronously.
+    /// </summary>
+    /// <param name="connection">The connection to reconnect.</param>
+    /// <returns>True if reconnection was successful; otherwise, false.</returns>
     public async Task<bool> ReconnectAsync(ITikConnection connection)
     {
         if (_credentials == null) return false;
@@ -205,6 +253,10 @@ public class TikConnectionPool : IDisposable
         });
     }
 
+    /// <summary>
+    /// Returns a connection to the pool asynchronously.
+    /// </summary>
+    /// <param name="connection">The connection to return.</param>
     public async Task ReturnConnectionAsync(ITikConnection connection)
     {
         if (_disposed || connection == null)
@@ -243,6 +295,10 @@ public class TikConnectionPool : IDisposable
         }
     }
 
+    /// <summary>
+    /// Returns a connection to the pool synchronously.
+    /// </summary>
+    /// <param name="connection">The connection to return.</param>
     public void ReturnConnection(ITikConnection connection)
     {
         if (_disposed || connection == null)
@@ -332,7 +388,12 @@ public class TikConnectionPool : IDisposable
         }
     }
 
-    private async Task<bool> IsConnectionHealthyAsync(ITikConnection connection)
+    /// <summary>
+    /// Checks if the specified connection is healthy asynchronously.
+    /// </summary>
+    /// <param name="connection">The connection to check.</param>
+    /// <returns>True if the connection is healthy; otherwise, false.</returns>
+    private static async Task<bool> IsConnectionHealthyAsync(ITikConnection connection)
     {
         if (connection == null || !connection.IsOpened)
             return false;
@@ -352,7 +413,12 @@ public class TikConnectionPool : IDisposable
         });
     }
 
-    private bool IsConnectionHealthy(ITikConnection connection)
+    /// <summary>
+    /// Checks if the specified connection is healthy.
+    /// </summary>
+    /// <param name="connection">The connection to check.</param>
+    /// <returns>True if the connection is healthy; otherwise, false.</returns>
+    private static bool IsConnectionHealthy(ITikConnection connection)
     {
         if (connection == null || !connection.IsOpened)
             return false;
@@ -455,6 +521,9 @@ public class TikConnectionPool : IDisposable
         });
     }
 
+    /// <summary>
+    /// Disposes the connection pool and releases all resources.
+    /// </summary>
     public void Dispose()
     {
         if (_disposed) return;
@@ -463,5 +532,6 @@ public class TikConnectionPool : IDisposable
         _healthCheckTimer?.Dispose();
         _poolSemaphore?.Dispose();
         DisposeAllConnectionsAsync().GetAwaiter().GetResult();
+        GC.SuppressFinalize(this);
     }
 }

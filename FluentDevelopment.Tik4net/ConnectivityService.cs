@@ -3,39 +3,37 @@ using System.Threading.Tasks;
 
 namespace FluentDevelopment.Tik4net
 {
+    /// <summary>
+    /// Provides connectivity status and related utilities for network access detection.
+    /// </summary>
     public static class ConnectivityService
     {
-        // 1. حقل خاص (Private Field) للاحتفاظ بالحالة الحالية.
         private static NetworkAccess _currentAccessStatus = NetworkAccess.Unknown;
 
-        // 2. الخاصية العامة (Public Property) للقراءة فقط.
-        // هذه هي واجهة المستخدم لقراءة حالة الاتصال.
-        // 
         /// <summary>
-        /// الحصول على حالة الوصول الحالية للشبكة (Unknown, None, Local, ConstrainedInternet, Internet).
+        /// Gets the current network access status. This property updates the status before returning the value.
         /// </summary>
         public static NetworkAccess CurrentAccessStatus
         {
-            get {
+            get
+            {
                 Task.Run(async () => await UpdateStatusAsync()).Wait();
-                return _currentAccessStatus; }
+                return _currentAccessStatus;
+            }
         }
 
         /// <summary>
-        /// دالة غير متزامنة (Async) لتحديث الحالة عن طريق إجراء فحص فعلي.
-        /// يجب استدعاء هذه الدالة أولاً للحصول على أحدث حالة.
+        /// Asynchronously updates the current network access status by checking connectivity.
         /// </summary>
+        /// <returns>A task representing the asynchronous operation.</returns>
         public static async Task UpdateStatusAsync()
         {
-            // استخدام المنطق المعقد من الفئة المساعدة
             NetworkAccess newStatus = await ConnectivityChecker.GetCurrentAccessStatusAsync();
-
-            // تحديث الحقل الخاص بالحالة
             _currentAccessStatus = newStatus;
         }
 
         /// <summary>
-        /// طريقة مساعدة لمعرفة ما إذا كان الجهاز متصلاً بالإنترنت بالكامل.
+        /// Gets a value indicating whether the device is fully connected to the Internet.
         /// </summary>
         public static bool IsFullyConnected
         {

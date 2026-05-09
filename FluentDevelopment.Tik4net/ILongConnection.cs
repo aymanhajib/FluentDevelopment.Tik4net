@@ -6,243 +6,222 @@ using tik4net;
 namespace FluentDevelopment.Tik4net;
 
 /// <summary>
-/// واجهة تمثل اتصالاً طويل المدى مع جهاز MikroTik
+/// Interface representing a long-term persistent connection with a MikroTik device.
 /// </summary>
 public interface ILongConnection : IDisposable
 {
     /// <summary>
-    /// معرف الاتصال الفريد
+    /// Unique identifier for the connection.
     /// </summary>
     Guid Id { get; }
 
     /// <summary>
-    /// اتصال Tik4Net الأساسي
+    /// The underlying Tik4Net connection instance.
     /// </summary>
     ITikConnection Connection { get; }
 
     /// <summary>
-    /// اسم الاتصال (اختياري)
+    /// Optional name or alias for the connection.
     /// </summary>
     string Name { get; }
 
     /// <summary>
-    /// يشير إلى ما إذا كان الاتصال نشطاً وقابلاً للاستخدام
+    /// Indicates whether the connection is active and ready for use.
     /// </summary>
     bool IsActive { get; }
 
     /// <summary>
-    /// وقت إنشاء الاتصال
+    /// The exact timestamp when the connection was established.
     /// </summary>
     DateTime CreatedAt { get; }
 
     /// <summary>
-    /// مدة تشغيل الاتصال
+    /// The total duration the connection has been active.
     /// </summary>
     TimeSpan Uptime { get; }
 
     /// <summary>
-    /// عدد العمليات التي تم تنفيذها على هذا الاتصال
+    /// Total number of operations executed during this connection's lifecycle.
     /// </summary>
     int OperationCount { get; }
 
     /// <summary>
-    /// تنفيذ عملية على الاتصال مع إدارة الأخطاء
+    /// Executes an operation on the connection with built-in error management.
     /// </summary>
-    /// <typeparam name="T">نوع نتيجة العملية</typeparam>
-    /// <param name="operation">العملية المطلوب تنفيذها</param>
-    /// <param name="operationName">اسم العملية (اختياري)</param>
-    /// <returns>نتيجة العملية</returns>
+    /// <typeparam name="T">The type of the operation result.</typeparam>
+    /// <param name="operation">The functional logic to execute.</param>
+    /// <param name="operationName">Optional name for the operation for tracking purposes.</param>
+    /// <returns>A task representing the operation result.</returns>
     Task<IOperationResult<T>> ExecuteAsync<T>(
         Func<ITikConnection, Task<T>> operation,
         string? operationName = null);
 
     /// <summary>
-    /// حدث يتغير عند تغيير حالة الاتصال
+    /// Event triggered whenever the connection status changes.
     /// </summary>
     event EventHandler<LongConnectionStatus> StatusChanged;
 
     /// <summary>
-    /// إغلاق الاتصال بشكل آمن
+    /// Gracefully closes the connection.
     /// </summary>
-    /// <param name="reason">سبب الإغلاق</param>
+    /// <param name="reason">Optional reason for closing the connection.</param>
     Task CloseAsync(string? reason = null);
 
     /// <summary>
-    /// إعادة تعيين الاتصال (في حالة فقدان الاتصال)
+    /// Attempts to re-establish the connection in case of failure or loss.
     /// </summary>
+    /// <returns>The result of the reconnection attempt.</returns>
     Task<IOperationResult> ReconnectAsync();
 
     /// <summary>
-    /// الحصول على إحصاءات الاتصال
+    /// Retrieves the current performance and data statistics for this connection.
     /// </summary>
     LongConnectionStats GetStats();
 }
 
 /// <summary>
-/// إحصائيات الاتصال الطويل
+/// Represents statistical data for a long-lived connection.
 /// </summary>
 public class LongConnectionStats
 {
     /// <summary>
-    /// إجمالي العمليات المنفذة
+    /// Total number of operations attempted.
     /// </summary>
     public int TotalOperations { get; set; }
 
     /// <summary>
-    /// العمليات الناجحة
+    /// Number of operations that completed successfully.
     /// </summary>
     public int SuccessfulOperations { get; set; }
 
     /// <summary>
-    /// العمليات الفاشلة
+    /// Number of operations that failed due to errors.
     /// </summary>
     public int FailedOperations { get; set; }
 
     /// <summary>
-    /// معدل النجاح
+    /// Calculated percentage of successful operations.
     /// </summary>
     public double SuccessRate => TotalOperations > 0 ?
         ((double)SuccessfulOperations / TotalOperations) * 100 : 100;
 
     /// <summary>
-    /// متوسط وقت التنفيذ
+    /// Average time taken to execute operations.
     /// </summary>
     public TimeSpan AverageExecutionTime { get; set; }
 
     /// <summary>
-    /// حجم البيانات المستلمة (بايت)
+    /// Total volume of data received in bytes.
     /// </summary>
     public long BytesReceived { get; set; }
 
     /// <summary>
-    /// حجم البيانات المرسلة (بايت)
+    /// Total volume of data sent in bytes.
     /// </summary>
     public long BytesSent { get; set; }
 
     /// <summary>
-    /// آخر عملية تم تنفيذها
+    /// The timestamp of the last executed operation.
     /// </summary>
     public DateTime? LastOperationTime { get; set; }
 
     /// <summary>
-    /// عدد إعادة الاتصال
+    /// Number of times the connection has been re-established.
     /// </summary>
     public int ReconnectCount { get; set; }
 }
 
 /// <summary>
-/// حالة الاتصال الطويل
+/// Represents the current state and contextual information of a long connection.
 /// </summary>
 public class LongConnectionStatus
 {
     /// <summary>
-    /// معرف الاتصال
+    /// The ID of the connection the status belongs to.
     /// </summary>
     public Guid ConnectionId { get; set; }
 
     /// <summary>
-    /// حالة الاتصال
+    /// Current status of the connection.
     /// </summary>
     public ConnectionStatus Status { get; set; }
 
     /// <summary>
-    /// اسم العملية (إذا كان مرتبطاً بعملية)
+    /// The name of the operation (if the status update is operation-related).
     /// </summary>
     public string? OperationName { get; set; }
 
     /// <summary>
-    /// مدة العملية (إذا كان مرتبطاً بعملية)
+    /// Duration of the operation (if applicable).
     /// </summary>
     public TimeSpan? Duration { get; set; }
 
     /// <summary>
-    /// مدة تشغيل الاتصال
+    /// Current uptime of the connection.
     /// </summary>
     public TimeSpan? Uptime { get; set; }
 
     /// <summary>
-    /// عدد العمليات
+    /// Current count of operations.
     /// </summary>
     public int? OperationCount { get; set; }
 
     /// <summary>
-    /// رسالة الخطأ (إذا وجد)
+    /// Error message detailing the failure (if applicable).
     /// </summary>
     public string? Error { get; set; }
 
     /// <summary>
-    /// سبب الإغلاق (إذا كان الاتصال مغلقاً)
+    /// Reason provided for closing the connection.
     /// </summary>
     public string? CloseReason { get; set; }
 
     /// <summary>
-    /// وقت التغيير
+    /// The timestamp when the status change occurred.
     /// </summary>
     public DateTime Timestamp { get; set; }
 
     /// <summary>
-    /// بيانات إضافية
+    /// Additional metadata or data associated with the status update.
     /// </summary>
     public object? Data { get; set; }
 }
 
 /// <summary>
-/// حالات الاتصال الممكنة
+/// Enumerates the possible states of a MikroTik API connection.
 /// </summary>
 public enum ConnectionStatus
 {
-    /// <summary>
-    /// جاري الإنشاء
-    /// </summary>
+    /// <summary> Initial state during connection creation. </summary>
     Creating,
 
-    /// <summary>
-    /// متصل
-    /// </summary>
+    /// <summary> Connection is successfully established and authenticated. </summary>
     Connected,
 
-    /// <summary>
-    /// مفصول
-    /// </summary>
+    /// <summary> Connection has been lost or manually disconnected. </summary>
     Disconnected,
 
-    /// <summary>
-    /// جاري إعادة الاتصال
-    /// </summary>
+    /// <summary> Re-authentication or socket recovery is in progress. </summary>
     Reconnecting,
 
-    /// <summary>
-    /// بدأت العملية
-    /// </summary>
+    /// <summary> An operation has started executing. </summary>
     OperationStarted,
 
-    /// <summary>
-    /// اكتملت العملية
-    /// </summary>
+    /// <summary> An operation has completed successfully. </summary>
     OperationCompleted,
 
-    /// <summary>
-    /// فشلت العملية
-    /// </summary>
+    /// <summary> An operation has failed to execute. </summary>
     OperationFailed,
 
-    /// <summary>
-    /// جاري الإغلاق
-    /// </summary>
+    /// <summary> Graceful teardown is in progress. </summary>
     Closing,
 
-    /// <summary>
-    /// مغلق
-    /// </summary>
+    /// <summary> Connection is closed and inactive. </summary>
     Closed,
 
-    /// <summary>
-    /// تم التخلص منه
-    /// </summary>
+    /// <summary> Object resources have been released. </summary>
     Disposed,
 
-    /// <summary>
-    /// خطأ في الاتصال
-    /// </summary>
+    /// <summary> A critical communication error has occurred. </summary>
     Error
 }

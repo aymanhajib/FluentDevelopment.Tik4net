@@ -1,17 +1,46 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-	  <TargetFrameworks>net9.0</TargetFrameworks>
-    <PackageId>FluentDevelopment.Tik4net</PackageId>
-    <Version>9.0.0</Version>
-    <Authors>FluentDevelopment</Authors>
-	  <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <Nullable>enable</Nullable>
-  </PropertyGroup>
+	<PropertyGroup>
+		<PackageId>FluentDevelopment.Tik4net</PackageId>
+		<Title>FluentDevelopment Tik4net Wrapper</Title>
+		<Version>10.0.0</Version>
+		<Authors>Fluent Development</Authors>
+		<Company>FluentDevelopment</Company>
+		<Copyright>Copyright (C) FluentDevelopment 2026</Copyright>
+	</PropertyGroup>
 
-  <ItemGroup>
-    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.11" />
-    <PackageReference Include="tik4net" Version="3.5.0" />
-  </ItemGroup>
+	<PropertyGroup>
+		<TargetFrameworks>net10.0</TargetFrameworks>
+		<Nullable>enable</Nullable>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<GenerateDocumentationFile>True</GenerateDocumentationFile>
+		<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+		<PackageOutputPath>../Build</PackageOutputPath>
+	</PropertyGroup>
+
+	<PropertyGroup>
+		<Description>A high-level .NET 10 wrapper for Tik4net, providing fluent MikroTik API integration with professional connection pooling, background tasks, and enhanced error mapping.</Description>
+		<PackageTags>MikroTik;Tik4net;RouterOS;Fluent;API;Logging;ConnectionPooling;Async</PackageTags>
+		<PackageLicenseExpression>MIT</PackageLicenseExpression>
+		<RepositoryUrl>https://github.com/aymanhajib/FluentDevelopment.Tik4net</RepositoryUrl>
+		<PackageProjectUrl>https://github.com/aymanhajib/FluentDevelopment.Tik4net</PackageProjectUrl>
+		<PackageReadmeFile>README.md</PackageReadmeFile>
+		<PackageIcon>FluentDevelopment.png</PackageIcon>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.0" />
+		<PackageReference Include="tik4net" Version="3.5.0" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<None Include="..\FluentDevelopment.png" Pack="true" PackagePath="\" />
+		<None Include="..\README.md" Pack="true" PackagePath="\" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<Using Include="Microsoft.Extensions.Logging" />
+		<Using Include="tik4net" />
+	</ItemGroup>
 
 </Project>

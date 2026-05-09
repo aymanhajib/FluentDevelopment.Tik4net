@@ -4,13 +4,13 @@ using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Concurrent;
 using System.Diagnostics;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
-using tik4net;
 
 namespace FluentDevelopment.Tik4net;
 
+/// <summary>
+/// Provides high-level management and pooling of MikroTik API connections, including
+/// quick operations, long-lived connections, background tasks, and connection statistics.
+/// </summary>
 public class TikService : ITikService, IDisposable
 {
     private readonly TikConnectionPool _pool;
@@ -18,23 +18,51 @@ public class TikService : ITikService, IDisposable
     private readonly ILogger<TikService>? _logger;
     private bool _disposed = false;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="TikService"/> class.
+    /// </summary>
+    /// <param name="maxPoolSize">The maximum number of connections in the pool.</param>
+    /// <param name="logger">The logger instance.</param>
     public TikService(int maxPoolSize = 10, ILogger<TikService>? logger = null)
     {
         _pool = new TikConnectionPool(maxPoolSize);
         _logger = logger;
     }
 
-    // الخصائص الحالية
+    /// <summary>
+    /// Gets a value indicating whether the service is logged in.
+    /// </summary>
     public bool IsLoggedIn => _pool.IsLoggedIn;
+
+    /// <summary>
+    /// Gets the number of available connections in the pool.
+    /// </summary>
     public int AvailableConnections => _pool.AvailableConnections;
+
+    /// <summary>
+    /// Gets the number of active connections in the pool.
+    /// </summary>
     public int ActiveConnections => _pool.ActiveConnections;
 
+    /// <summary>
+    /// Logs in to the MikroTik API using the specified credentials.
+    /// </summary>
+    /// <param name="host">The host address.</param>
+    /// <param name="username">The username.</param>
+    /// <param name="password">The password.</param>
+    /// <param name="port">The port number (default is 8728).</param>
+    /// <returns>A <see cref="LoginResult"/> indicating the result of the login operation.</returns>
     public async Task<LoginResult> LoginAsync(string host, string username, string password, int port = 8728)
     {
         return await _pool.LoginAsync(host, username, password, port);
     }
 
-    // 1. QuickAsync المحسنة
+    /// <summary>
+    /// Executes a quick asynchronous operation using a pooled connection.
+    /// </summary>
+    /// <param name="operation">The operation to execute.</param>
+    /// <param name="cancellationToken">A cancellation token.</param>
+    /// <returns>An <see cref="IOperationResult"/> representing the result.</returns>
     public async Task<IOperationResult> QuickAsync(
         Func<ITikConnection, Task> operation,
         CancellationToken cancellationToken = default)
@@ -43,22 +71,21 @@ public class TikService : ITikService, IDisposable
         ITikConnection? connection = null;
         try
         {
-            _logger?.LogDebug("Starting QuickAsync operation");
+            if (_logger?.IsEnabled(LogLevel.Debug) == true)
+                _logger.LogDebug("Starting QuickAsync operation");
 
-            // التحقق من حالة الخدمة
             if (!IsLoggedIn)
                 return OperationResult.Failure(
                     "Service is not logged in",
                     null,
                     DateTime.UtcNow - startTime);
 
-            // الحصول على اتصال
             connection = await _pool.GetConnectionAsync(cancellationToken);
-
-            // تنفيذ العملية
             await operation(connection);
 
-            _logger?.LogInformation("QuickAsync operation completed successfully");
+            if (_logger?.IsEnabled(LogLevel.Information) == true)
+                _logger.LogInformation("QuickAsync operation completed successfully");
+
             return OperationResult.Success(
                 DateTime.UtcNow - startTime);
         }
@@ -73,34 +100,37 @@ public class TikService : ITikService, IDisposable
         {
             if (connection != null)
             {
-                // إرجاع الاتصال للـ Pool حتى في حالة الخطأ
                 await _pool.ReturnConnectionAsync(connection);
             }
         }
     }
 
+    /// <summary>
+    /// Executes a quick synchronous operation using a pooled connection.
+    /// </summary>
+    /// <param name="operation">The operation to execute.</param>
+    /// <returns>An <see cref="IOperationResult"/> representing the result.</returns>
     public IOperationResult Quick(Action<ITikConnection> operation)
     {
         var startTime = DateTime.UtcNow;
         ITikConnection? connection = null;
         try
         {
-            _logger?.LogDebug("Starting Quick operation");
+            if (_logger?.IsEnabled(LogLevel.Debug) == true)
+                _logger.LogDebug("Starting Quick operation");
 
-            // التحقق من حالة الخدمة
             if (!IsLoggedIn)
                 return OperationResult.Failure(
                     "Service is not logged in",
                     null,
                     DateTime.UtcNow - startTime);
 
-            // الحصول على اتصال
             connection = _pool.GetConnection();
-
-            // تنفيذ العملية
             operation(connection);
 
-            _logger?.LogInformation("Quick operation completed successfully");
+            if (_logger?.IsEnabled(LogLevel.Information) == true)
+                _logger.LogInformation("Quick operation completed successfully");
+
             return OperationResult.Success(
                 DateTime.UtcNow - startTime);
         }
@@ -113,7 +143,6 @@ public class TikService : ITikService, IDisposable
         }
         finally
         {
-            // إرجاع الاتصال للـ Pool حتى في حالة الخطأ
             if (connection != null)
             {
                 _pool.ReturnConnection(connection);
@@ -121,7 +150,14 @@ public class TikService : ITikService, IDisposable
         }
     }
 
-    // 2. GetLongConnectionAsync المحسنة
+    /// <summary>
+    /// Gets a long-lived connection for advanced operations.
+    /// </summary>
+    /// <param name="operation">An optional operation to execute on connection.</param>
+    /// <param name="connectionName">The name of the connection.</param>
+    /// <param name="onStatusChanged">Callback for status changes.</param>
+    /// <param name="cancellationToken">A cancellation token.</param>
+    /// <returns>An <see cref="IOperationResult{ILongConnection}"/> representing the result.</returns>
     public async Task<IOperationResult<ILongConnection>> GetLongConnectionAsync(
             Func<ITikConnection, Task>? operation = null,
             string? connectionName = null,
@@ -134,7 +170,8 @@ public class TikService : ITikService, IDisposable
 
         try
         {
-            _logger?.LogDebug("Creating long connection {ConnectionId}", connectionId);
+            if (_logger?.IsEnabled(LogLevel.Debug) == true)
+                _logger.LogDebug("Creating long connection {ConnectionId}", connectionId);
 
             if (!IsLoggedIn)
                 return OperationResult<ILongConnection>.Failure(
@@ -144,7 +181,6 @@ public class TikService : ITikService, IDisposable
 
             var connection = await _pool.GetConnectionAsync(cancellationToken);
 
-            // إنشاء اتصال طويل
             var longConnection = new LongConnection(
                 connectionId,
                 connection,
@@ -165,10 +201,8 @@ public class TikService : ITikService, IDisposable
                 _pool.ReconnectAsync,
                 _logger);
 
-            // إضافة للقائمة النشطة
             _activeLongConnections.TryAdd(connectionId, longConnection);
 
-            // تنفيذ callback إذا وُجد
             if (operation != null)
             {
                 try
@@ -177,16 +211,13 @@ public class TikService : ITikService, IDisposable
                 }
                 catch (Exception ex)
                 {
-                    _logger?.LogError(ex,
-                        "Error in onConnected callback for connection {ConnectionId}",
-                        connectionId);
-                    // لا نعيد فشلاً هنا لأن الاتصال تم إنشاؤه بنجاح
+                    if (_logger?.IsEnabled(LogLevel.Error) == true)
+                        _logger.LogError(ex, "Error in onConnected callback for connection {ConnectionId}", connectionId);
                 }
             }
 
-            _logger?.LogInformation(
-                "Long connection {ConnectionId} created successfully",
-                connectionId);
+            if (_logger?.IsEnabled(LogLevel.Information) == true)
+                _logger.LogInformation("Long connection {ConnectionId} created successfully", connectionId);
 
             return OperationResult<ILongConnection>.Success(
                 longConnection,
@@ -201,7 +232,13 @@ public class TikService : ITikService, IDisposable
         }
     }
 
-    // 3. BackgroundAsync المحسنة
+    /// <summary>
+    /// Runs an operation in the background using a pooled connection.
+    /// </summary>
+    /// <param name="operation">The operation to execute.</param>
+    /// <param name="onCompleted">Callback when the operation completes.</param>
+    /// <param name="cancellationToken">A cancellation token.</param>
+    /// <returns>An <see cref="IOperationResult"/> representing the result.</returns>
     public async Task<IOperationResult> BackgroundAsync(
         Func<ITikConnection, Task> operation,
         Action<IOperationResult>? onCompleted = null,
@@ -212,9 +249,8 @@ public class TikService : ITikService, IDisposable
 
         try
         {
-            _logger?.LogDebug(
-                "Starting background operation {OperationId}",
-                operationId);
+            if (_logger?.IsEnabled(LogLevel.Debug) == true)
+                _logger.LogDebug("Starting background operation {OperationId}", operationId);
 
             if (!IsLoggedIn)
             {
@@ -228,7 +264,6 @@ public class TikService : ITikService, IDisposable
 
             var connection = await _pool.GetConnectionAsync(cancellationToken);
 
-            // تشغيل العملية في الخلفية
             _ = Task.Run(async () =>
             {
                 IOperationResult backgroundResult;
@@ -239,9 +274,8 @@ public class TikService : ITikService, IDisposable
                     backgroundResult = OperationResult.Success(
                         DateTime.UtcNow - startTime);
 
-                    _logger?.LogInformation(
-                        "Background operation {OperationId} completed successfully",
-                        operationId);
+                    if (_logger?.IsEnabled(LogLevel.Information) == true)
+                        _logger.LogInformation("Background operation {OperationId} completed successfully", operationId);
                 }
                 catch (Exception ex)
                 {
@@ -250,16 +284,14 @@ public class TikService : ITikService, IDisposable
                         ex,
                         DateTime.UtcNow - startTime);
 
-                    _logger?.LogError(ex,
-                        "Background operation {OperationId} failed",
-                        operationId);
+                    if (_logger?.IsEnabled(LogLevel.Error) == true)
+                        _logger.LogError(ex, "Background operation {OperationId} failed", operationId);
                 }
                 finally
                 {
                     await _pool.ReturnConnectionAsync(connection);
                 }
 
-                // استدعاء callback عند الانتهاء
                 onCompleted?.Invoke(backgroundResult);
             }, cancellationToken);
 
@@ -267,9 +299,8 @@ public class TikService : ITikService, IDisposable
         }
         catch (Exception ex)
         {
-            _logger?.LogError(ex,
-                "Failed to start background operation {OperationId}",
-                operationId);
+            if (_logger?.IsEnabled(LogLevel.Error) == true)
+                _logger.LogError(ex, "Failed to start background operation {OperationId}", operationId);
 
             var result = OperationResult.Failure(
                 GetMessageException(ex, "Background"),
@@ -281,61 +312,76 @@ public class TikService : ITikService, IDisposable
         }
     }
 
-    private string GetMessageException(Exception ex, string actionName)
+    /// <summary>
+    /// Returns a user-friendly error message for a given exception and action name.
+    /// </summary>
+    /// <param name="ex">The exception that occurred.</param>
+    /// <param name="actionName">The name of the action being performed when the exception occurred.</param>
+    /// <returns>A string containing a user-friendly error message.</returns>
+    protected virtual string GetMessageException(Exception ex, string actionName)
     {
         // سنستخدم المتغير message لتخزين ما سيظهر للمستخدم أو الواجهة
         string message;
-
         if (ex is NotImplementedException)
         {
-            _logger?.LogError(ex, $"{actionName} operation not supported");
+            if (_logger?.IsEnabled(LogLevel.Error) == true)
+                _logger.LogError(ex, "{ActionName} operation not supported", actionName);
             message = "هذه العملية غير مدعومة في إصدار المايكروتك الحالي.";
         }
         else if (ex is InvalidOperationException || ex is OperationCanceledException)
         {
-            _logger?.LogWarning(ex, $"{actionName} operation was cancelled");
+            if (_logger?.IsEnabled(LogLevel.Warning) == true)
+                _logger.LogWarning(ex, "{ActionName} operation was cancelled", actionName);
             message = "تم إلغاء العملية أو أنها غير صالحة حالياً.";
         }
         // الخطأ الأكثر شيوعاً: السيرفر رفض الأمر لسبب منطقي (مثل كلمة سر ضعيفة أو مستخدم موجود)
         else if (ex is TikCommandTrapException trapEx)
         {
-            _logger?.LogWarning(trapEx, $"{actionName}: Trap error from RouterOS");
+            if (_logger?.IsEnabled(LogLevel.Warning) == true)
+                _logger.LogWarning(trapEx, "{ActionName}: Trap error from RouterOS", actionName);
             // جلب الرسالة القادمة من المايكروتك نفسه (مثل: "user already exists")
             message = $"خطأ من السيرفر: {trapEx.Code} - {trapEx.Message}";
         }
         else if (ex is TikCommandFatalException fatalEx)
         {
-            _logger?.LogCritical(fatalEx, $"{actionName}: Fatal connection error");
+            if (_logger?.IsEnabled(LogLevel.Critical) == true)
+                _logger.LogCritical(fatalEx, "{ActionName}: Fatal connection error", actionName);
             message = "انقطع الاتصال بالسيرفر بشكل مفاجئ. يرجى التحقق من الشبكة.";
         }
         else if (ex is TikNoSuchCommandException)
         {
-            _logger?.LogError(ex, $"{actionName}: Invalid API path");
+            if (_logger?.IsEnabled(LogLevel.Error) == true)
+                _logger.LogError(ex, "{ActionName}: Invalid API path", actionName);
             message = "المسار البرمجي غير صحيح. يرجى التأكد من كتابة الأمر بدقة.";
         }
         else if (ex is TikNoSuchItemException)
         {
-            _logger?.LogWarning(ex, $"{actionName}: Item not found");
+            if (_logger?.IsEnabled(LogLevel.Warning) == true)
+                _logger.LogWarning(ex, "{ActionName}: Item not found", actionName);
             message = "العنصر المطلوب (مستخدم/سجل) غير موجود في السيرفر.";
         }
         else if (ex is TikAlreadyHaveSuchItemException)
         {
-            _logger?.LogWarning(ex, $"{actionName}: Duplicate item");
+            if (_logger?.IsEnabled(LogLevel.Warning) == true)
+                _logger.LogWarning(ex, "{ActionName}: Duplicate item", actionName);
             message = "هذا العنصر (الاسم أو المعرف) موجود مسبقاً في السيرفر.";
         }
         else if (ex is TikCommandUnexpectedResponseException unexEx)
         {
-            _logger?.LogError(unexEx, $"{actionName}: Unexpected response");
+            if (_logger?.IsEnabled(LogLevel.Error) == true)
+                _logger.LogError(unexEx, "{ActionName}: Unexpected response", actionName);
             message = "وصل رد غير متوقع من السيرفر. قد يكون هناك اختلاف في الإصدارات.";
         }
         else if (ex is TikCommandAmbiguousResultException)
         {
-            _logger?.LogError(ex, $"{actionName}: Ambiguous result");
+            if (_logger?.IsEnabled(LogLevel.Error) == true)
+                _logger.LogError(ex, "{ActionName}: Ambiguous result", actionName);
             message = "النتيجة غامضة؛ الأمر أعاد أكثر من قيمة بينما المتوقع قيمة واحدة.";
         }
         else
         {
-            _logger?.LogError(ex, $"{actionName}: operation failed with unknown error");
+            if (_logger?.IsEnabled(LogLevel.Error) == true)
+                _logger.LogError(ex, "{ActionName}: operation failed with unknown error", actionName);
             message = "حدث خطأ غير معروف أثناء تنفيذ العملية.";
         }
 
@@ -388,7 +434,10 @@ public class TikService : ITikService, IDisposable
             _logger = logger;
             CreatedAt = DateTime.UtcNow;
 
-            _logger?.LogInformation("Enhanced long connection {Name} ({Id}) created", name, id);
+            if (_logger?.IsEnabled(LogLevel.Information) == true)
+            {
+                _logger.LogInformation("Enhanced long connection {Name} ({Id}) created", name, id);
+            }
 
             RaiseStatusChanged(new LongConnectionStatus
             {
@@ -437,8 +486,11 @@ public class TikService : ITikService, IDisposable
                 Interlocked.Add(ref _bytesReceived, 1024); // مثال: 1KB مستلم
                 Interlocked.Add(ref _bytesSent, 512); // مثال: 512B مرسل
 
-                _logger?.LogDebug("Long connection {Id} operation {Name} completed in {Elapsed}ms",
-                    _id, operationName, stopwatch.ElapsedMilliseconds);
+                if (_logger?.IsEnabled(LogLevel.Debug) == true)
+                {
+                    _logger.LogDebug("Long connection {Id} operation {Name} completed in {Elapsed}ms",
+                        _id, operationName, stopwatch.ElapsedMilliseconds);
+                }
 
                 RaiseStatusChanged(new LongConnectionStatus
                 {
@@ -458,8 +510,11 @@ public class TikService : ITikService, IDisposable
                 stopwatch.Stop();
                 Interlocked.Increment(ref _failedOperations);
 
-                _logger?.LogError(ex, "Long connection {Id} operation {Name} failed after {Elapsed}ms",
-                    _id, operationName, stopwatch.ElapsedMilliseconds);
+                if (_logger?.IsEnabled(LogLevel.Error) == true)
+                {
+                    _logger.LogError(ex, "Long connection {Id} operation {Name} failed after {Elapsed}ms",
+                        _id, operationName, stopwatch.ElapsedMilliseconds);
+                }
 
                 RaiseStatusChanged(new LongConnectionStatus
                 {
@@ -503,7 +558,10 @@ public class TikService : ITikService, IDisposable
                     Timestamp = DateTime.UtcNow
                 });
 
-                _logger?.LogInformation("Attempting to reconnect long connection {Id}", _id);
+                if (_logger?.IsEnabled(LogLevel.Information) == true)
+                {
+                    _logger.LogInformation("Attempting to reconnect long connection {Id}", _id);
+                }
 
                 // إغلاق الاتصال الحالي إذا كان مفتوحاً
                 if (_connection.IsOpened)
@@ -526,7 +584,10 @@ public class TikService : ITikService, IDisposable
                         Data = new { ReconnectCount = _reconnectCount }
                     });
 
-                    _logger?.LogInformation("Long connection {Id} reconnected successfully", _id);
+                    if (_logger?.IsEnabled(LogLevel.Information) == true)
+                    {
+                        _logger.LogInformation("Long connection {Id} reconnected successfully", _id);
+                    }
 
                     return OperationResult.Success(Uptime);
                 }
@@ -552,7 +613,10 @@ public class TikService : ITikService, IDisposable
                     Timestamp = DateTime.UtcNow
                 });
 
-                _logger?.LogError(ex, "Failed to reconnect long connection {Id}", _id);
+                if (_logger?.IsEnabled(LogLevel.Error) == true)
+                {
+                    _logger.LogError(ex, "Failed to reconnect long connection {Id}", _id);
+                }
 
                 return OperationResult.Failure($"Reconnection failed: {ex.Message}", ex);
             }
@@ -572,8 +636,11 @@ public class TikService : ITikService, IDisposable
                     Timestamp = DateTime.UtcNow
                 });
 
-                _logger?.LogInformation("Closing long connection {Id}. Reason: {Reason}",
-                    _id, reason ?? "Manual closure");
+                if (_logger?.IsEnabled(LogLevel.Information) == true)
+                {
+                    _logger.LogInformation("Closing long connection {Id}. Reason: {Reason}",
+                        _id, reason ?? "Manual closure");
+                }
 
                 // إغلاق الاتصال الأساسي
                 if (_connection.IsOpened)
@@ -594,12 +661,18 @@ public class TikService : ITikService, IDisposable
                     Timestamp = DateTime.UtcNow
                 });
 
-                _logger?.LogInformation("Long connection {Id} closed successfully after {Uptime}",
-                    _id, Uptime);
+                if (_logger?.IsEnabled(LogLevel.Information) == true)
+                {
+                    _logger.LogInformation("Long connection {Id} closed successfully after {Uptime}",
+                        _id, Uptime);
+                }
             }
             catch (Exception ex)
             {
-                _logger?.LogError(ex, "Error closing long connection {Id}", _id);
+                if (_logger?.IsEnabled(LogLevel.Error) == true)
+                {
+                    _logger.LogError(ex, "Error closing long connection {Id}", _id);
+                }
                 throw;
             }
         }
@@ -642,12 +715,18 @@ public class TikService : ITikService, IDisposable
                     Timestamp = DateTime.UtcNow
                 });
 
-                _logger?.LogInformation("Enhanced long connection {Name} ({Id}) disposed after {Uptime} with {Ops} operations",
-                    _name, _id, Uptime, _operationCount);
+                if (_logger?.IsEnabled(LogLevel.Information) == true)
+                {
+                    _logger.LogInformation("Enhanced long connection {Name} ({Id}) disposed after {Uptime} with {Ops} operations",
+                        _name, _id, Uptime, _operationCount);
+                }
             }
             catch (Exception ex)
             {
-                _logger?.LogError(ex, "Error disposing long connection {Id}", _id);
+                if (_logger?.IsEnabled(LogLevel.Error) == true)
+                {
+                    _logger.LogError(ex, "Error disposing long connection {Id}", _id);
+                }
             }
         }
 
@@ -661,13 +740,15 @@ public class TikService : ITikService, IDisposable
         }
     }
 
-    // 5. LogoutAsync المحسنة
+    /// <summary>
+    /// Logs out and disposes all long connections and the connection pool.
+    /// </summary>
+    /// <returns>A task representing the asynchronous operation.</returns>
     public async Task LogoutAsync()
     {
-        _logger?.LogInformation("Logging out, closing {Count} long connections",
-            _activeLongConnections.Count);
+        if (_logger?.IsEnabled(LogLevel.Information) == true)
+            _logger.LogInformation("Logging out, closing {Count} long connections", _activeLongConnections.Count);
 
-        // إغلاق جميع الاتصالات الطويلة
         foreach (var (id, connection) in _activeLongConnections.ToList())
         {
             try
@@ -676,9 +757,8 @@ public class TikService : ITikService, IDisposable
             }
             catch (Exception ex)
             {
-                _logger?.LogError(ex,
-                    "Error disposing long connection {ConnectionId}",
-                    id);
+                if (_logger?.IsEnabled(LogLevel.Error) == true)
+                    _logger.LogError(ex, "Error disposing long connection {ConnectionId}", id);
             }
         }
 
@@ -686,7 +766,9 @@ public class TikService : ITikService, IDisposable
         await _pool.LogoutAsync();
     }
 
-    // 6. Dispose المحسنة
+    /// <summary>
+    /// Disposes the TikService and releases all resources.
+    /// </summary>
     public void Dispose()
     {
         if (_disposed) return;
@@ -696,15 +778,21 @@ public class TikService : ITikService, IDisposable
         {
             LogoutAsync().GetAwaiter().GetResult();
             _pool?.Dispose();
-            _logger?.LogInformation("TikService disposed successfully");
+            if (_logger?.IsEnabled(LogLevel.Information) == true)
+                _logger.LogInformation("TikService disposed successfully");
         }
         catch (Exception ex)
         {
-            _logger?.LogError(ex, "Error during TikService disposal");
+            if (_logger?.IsEnabled(LogLevel.Error) == true)
+                _logger.LogError(ex, "Error during TikService disposal");
         }
+        GC.SuppressFinalize(this);
     }
 
-    // 7. طريقة مساعدة للحصول على إحصاءات
+    /// <summary>
+    /// Gets statistics about the current connections and pool.
+    /// </summary>
+    /// <returns>A <see cref="ConnectionStatistics"/> object.</returns>
     public ConnectionStatistics GetStatistics()
     {
         return new ConnectionStatistics

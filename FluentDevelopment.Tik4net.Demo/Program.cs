@@ -7,8 +7,18 @@ namespace FluentDevelopment.Tik4net.Demo
 {
     class Program
     {
+        static string? username;
+        static string? password;
+
         static async Task Main(string[] args)
         {
+            Console.WriteLine("=== Enter username ===");
+            username = Console.ReadLine();
+            Console.WriteLine();
+            Console.WriteLine("=== Enter password ===");
+            password = Console.ReadLine();
+            Console.WriteLine();
+
             Console.WriteLine("=== Start view TikService ===");
             Console.WriteLine();
 
@@ -28,32 +38,6 @@ namespace FluentDevelopment.Tik4net.Demo
             try
             {
                 await RunCompleteDemo(tikService);
-                /*
-                var loginResult = await tikService.LoginAsync(
-                host: "192.168.88.1",
-                username: "ayman",
-                password: "123Qwertyuiop!@#",
-                port: 8728);
-                var res = tikService.Quick( con =>
-                {
-                    var activeCmd = con.CreateCommand("/ip/hotspot/active/print");
-                    //activeCmd.AddParameter("?user", "123456");
-                    var activeList = activeCmd.ExecuteList();
-
-                    foreach (var i in activeList)
-                    {
-                        Console.WriteLine(i.Words["mac-address"]);
-                    }
-
-                });
-                if (res.IsSuccess)
-                {
-                    Console.WriteLine("تم العميلة");
-                }
-                else
-                {
-                    Console.WriteLine(res.ErrorMessage);
-                }*/
             }
             catch (Exception ex)
             {
@@ -74,8 +58,8 @@ namespace FluentDevelopment.Tik4net.Demo
             Console.WriteLine("\n1. Login to MikroTik...");
             var loginResult = await tikService.LoginAsync(
                 host: "192.168.88.1",
-                username: "ayman",
-                password: "123Qwertyuiop!@#",
+                username: username ?? string.Empty,
+                password: password ?? string.Empty,
                 port: 8728);
 
             if (!loginResult.IsSuccess)
@@ -116,42 +100,8 @@ namespace FluentDevelopment.Tik4net.Demo
             {
                 Console.WriteLine($"Number of users");
             }
-            /*
-            // ===== 3. استخدام RetryAsync =====
-            Console.WriteLine("\n3. استخدام RetryAsync مع إعادة المحاولة...");
-
-            var interfacesResult = await tikService.RetryAsync(async connection =>
-            {
-                var cmd = connection.CreateCommand("/interface/print");
-                var interfaces = await Task.Run(() => cmd.ExecuteList());
-                return interfaces;
-            }, maxRetries: 3, delayBetweenRetries: TimeSpan.FromSeconds(1));
-
-            if (interfacesResult.IsSuccess)
-            {
-                Console.WriteLine($"عدد الواجهات: {interfacesResult.Data?.Count ?? 0}");
-            }
-
-            // ===== 4. استخدام TimeoutAsync =====
-            Console.WriteLine("\n4. استخدام TimeoutAsync مع مهلة زمنية...");
-
-            var timeoutResult = await tikService.TimeoutAsync(async connection =>
-            {
-                await Task.Delay(2000); // محاكاة عملية طويلة
-                var cmd = connection.CreateCommand("/system/clock/print");
-                return await Task.Run(() => cmd.ExecuteList());
-            }, timeout: TimeSpan.FromSeconds(3));
-
-            if (timeoutResult.IsSuccess)
-            {
-                Console.WriteLine("تم جلب وقت النظام بنجاح ✓");
-            }
-            else
-            {
-                Console.WriteLine($"فشل مع المهلة: {timeoutResult.ErrorMessage}");
-            }*/
             
-            // ===== 5. استخدام GetLongConnectionAsync =====
+            // ===== 3. استخدام GetLongConnectionAsync =====
             Console.WriteLine("\n5. Use GetLongConnectionAsync to long conection...");
 
             var longConnectionResult = await tikService.GetLongConnectionAsync(
@@ -208,7 +158,7 @@ namespace FluentDevelopment.Tik4net.Demo
                 }
             }
 
-            // ===== 6. استخدام BackgroundAsync =====
+            // ===== 4. استخدام BackgroundAsync =====
             Console.WriteLine("\n6. use BackgroundAsync to process in background...");
 
             var backgroundTasks = new List<Task<IOperationResult>>();
@@ -239,10 +189,10 @@ namespace FluentDevelopment.Tik4net.Demo
             await Task.WhenAll(backgroundTasks);
             Console.WriteLine("Completed all tasks ✓");
 
-            // ===== 11. تسجيل الخروج =====
+            // ===== 5. تسجيل الخروج =====
             Console.WriteLine("\n11. Logout...");
 
-            // ===== 12. عرض الإحصاءات النهائية =====
+            // ===== 6. عرض الإحصاءات النهائية =====
             Console.WriteLine("\n12. Totel end...");
 
             var finalStats = tikService.GetStatistics();
